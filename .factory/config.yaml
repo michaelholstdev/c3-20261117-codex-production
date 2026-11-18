@@ -1,0 +1,112 @@
+# Agentic Software Factory — project configuration.
+# Managed by /software-factory:factory-init. Edit freely; re-running init never overwrites this file.
+# Values marked REQUIRED are deployment-specific and are never inferred.
+schema_version: 8
+
+factory:
+  github:
+    owner: michaelholstdev            # REQUIRED: repository owner (user or organization)
+    repository: c3-20261117-codex-production       # REQUIRED: repository name
+    project_owner: michaelholstdev    # REQUIRED: GitHub Project owner (user or organization)
+    project_number: 12   # REQUIRED: GitHub Project (v2) number, or create one with setup
+    status_field: Status
+    statuses:
+      planning: Planning
+      design: Design
+      ready: Ready
+      building: Building
+      review: Review
+      qa: QA
+      merge: Merge
+      done: Done
+    blocked_label: blocked
+    feature_label: "factory:feature"
+    implementation_label: "factory:issue"
+    product_label: "factory:product"
+  execution:
+    autonomy: hybrid
+    max_parallel_issues: 2
+    max_correction_rounds_per_issue: 3
+    max_transient_retries: 2
+    worktrees: true
+  models:                  # model per agent role: inherit (the session model), an alias or a claude-* id
+    engineer: inherit
+    reviewer: inherit
+    qa: inherit
+    planner: inherit
+    analyst: inherit       # release notes, risk analysis and failure diagnosis (factory-deliver)
+    designer: inherit      # product architecture (factory-create-app)
+  commands:                # REQUIRED before development workflows run; never invented
+    lint: null
+    typecheck: null
+    test: "npm test"
+    build: null
+  git:
+    remote: origin
+    base_branch: main
+    conventional_commits: required
+    require_pr: true
+    merge_strategy: squash
+    protected_branches: [main]
+    auto_merge: false      # true lets factory-develop merge without a per-run authorization
+    required_checks: [commitlint, "unit-tests (22)", "unit-tests (24)"]    # CI check names that must pass on the PR head before merging
+  engineering:
+    methodology_plugin: mattpocock-skills   # provides /implement, tdd, code-review
+    methodology_version: "1.3.1"            # pinned and reviewed version
+    methodology_dir: null                   # optional path to that plugin; default: installed copy
+    methodology_sha256: null                # sha256 of that version's /implement skill; null = the digest reviewed with this plugin
+  approvals:
+    architecture_scope_change: required
+    destructive_migration: required
+    security_policy_exception: required
+    production_deploy: project_configurable
+  delivery:
+    profile: code_only     # code_only | release | production
+    staging: false         # production profile: deploy and verify environments.staging first
+    max_attempts: 2        # deploy attempts per environment (bounded retries)
+    risk_analysis: deterministic   # deterministic | agent (the agent can only add approval triggers)
+    release:               # release and production profiles; see docs/delivery.md
+      strategy: conventional      # conventional (built in) | manual | external (your own release tool)
+      branch: null                # release branch; null = factory.git.base_branch
+      tag_prefix: "v"
+      initial_version: "0.1.0"    # first version when the repository has no release tag
+      command: null               # external strategy: the command that releases (e.g. semantic-release)
+      notes: generated            # generated | agent
+      github_release: false       # create and verify a GitHub Release for the tag
+      prerelease: false
+      artifacts:
+        build: null               # command that creates the release artifacts
+        paths: []                 # files it must create, relative to the release checkout (verified, digested)
+    risk:                  # path patterns that make a conditional approval ask a person
+      destructive_migration: []
+      infrastructure: []
+      security: []
+      policy: []
+    environments:          # REQUIRED for the production profile (never inferred); see docs/delivery.md
+      # production:
+      #   approval: mandatory                  # automatic | conditional | mandatory
+      #   deploy: "./scripts/deploy.sh"        # your command; receives DELIVERY_VERSION, DELIVERY_COMMIT, ...
+      #   health_url: "https://app.example.test/health"
+  product:               # app ideas (factory-create-app); see docs/product-planning.md
+    discovery:
+      max_questions: 5          # most questions put to the user per round (only material ones are asked)
+    mvp:
+      preference: smallest      # smallest | balanced: how hard the MVP is cut
+      max_features: 12          # most MVP features; a larger MVP is rejected by gate P1
+    planning:
+      max_features: 40          # most features in the whole backlog (MVP, later and deferred)
+      max_correction_rounds: 2  # automatic corrections per stage after a failed gate P1
+    approval:
+      mvp: mandatory            # fixed: a person always approves the MVP and the architecture
+      high_risk_decisions: individual   # individual | bundle: authorize each high-risk decision by id, or with the approval as a whole
+    execution:             # building the approved MVP (factory-build-app); see docs/product-workflow.md
+      max_concurrent_features: 2     # features developed at once; also capped by factory.execution.max_parallel_issues
+      shared_components: serialize   # serialize | parallel: features relying on the same COMP-* run one after another
+      max_feature_attempts: 2        # relaunches of a feature whose workflow ended without finishing, then it is escalated
+      claim_ttl_minutes: 180         # a running build older than this without a heartbeat may be taken over
+    completion:            # the combined MVP, before the product counts as complete
+      validation_commands: []        # extra commands run against the integrated MVP (e.g. an end-to-end suite)
+  progress:
+    github_projects: required
+    claude_workflows: enabled
+    external_dashboard: optional
